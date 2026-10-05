@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GATE Study Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --wall: #e8e9f0;
+    --panel: #ffffff;
+    --ink: #26272c;
+    --muted: #6c6e7a;
+    --line: #dcdde6;
+    --pink: #f0a9bc;
+    --pink-deep: #c9587a;
+    --lcd: #c9cbb3;
+    --lcd-ink: #2b2c26;
+    --today: #c9587a;
+    --font-ui: "Bricolage Grotesque", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-lcd: "DM Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --wall: #1c1d24;
+      --panel: #262731;
+      --ink: #eeeef3;
+      --muted: #9a9cab;
+      --line: #383a48;
+      --lcd: #b3b59d;
+      --pink: #d8879f;
+      --pink-deep: #f0a9bc;
+      --today: #f0a9bc;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--wall);
+    color: var(--ink);
+    line-height: 1.45;
+    min-height: 100vh;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: .95rem; }
+  button { font: inherit; cursor: pointer; }
+  button:disabled { cursor: default; }
+  :focus-visible { outline: 3px solid var(--pink-deep); outline-offset: 2px; }
+
+  .btn {
+    border: 0; border-radius: 999px; padding: 10px 18px;
+    background: var(--pink); color: #3a1522; font-weight: 700;
+  }
+  .btn:hover:not(:disabled) { filter: brightness(.96); }
+  .btn:disabled { opacity: .6; }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); font-weight: 500; }
+  .btn.small { padding: 6px 12px; font-size: .85rem; }
+
+  .today-bar {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--panel); border-radius: 18px; padding: 16px 18px; margin-bottom: 16px;
+    border-left: 6px solid var(--pink);
+  }
+  .today-bar strong { display: block; font-size: 1.05rem; }
+  .today-bar span { color: var(--muted); font-size: .9rem; }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
+  .stat { background: var(--panel); border-radius: 18px; padding: 16px 18px; }
+  .stat h2 { margin: 0 0 10px; font-size: .95rem; font-weight: 500; color: var(--muted); }
+  .lcd {
+    background: var(--lcd); color: var(--lcd-ink); border-radius: 10px;
+    font-family: var(--font-lcd); padding: 10px 14px;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.18);
+  }
+  .stat .lcd { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+  .stat .lcd .k { font-size: .78rem; opacity: .75; }
+  .stat .lcd .v { font-size: 1.5rem; font-weight: 500; }
+  .stat .foot { color: var(--muted); font-size: .82rem; margin-top: 10px; }
+
+  .cal { background: var(--panel); border-radius: 18px; padding: 16px 12px 12px; }
+  .cal-head { display: flex; align-items: center; justify-content: space-between; padding: 0 6px 12px; }
+  .cal-head h2 { margin: 0; font-size: 1.15rem; }
+  .cal-nav { display: flex; gap: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr) 0.95fr; gap: 4px; }
+  .dow { text-align: center; font-size: .78rem; color: var(--muted); padding: 4px 0 6px; }
+  .day {
+    position: relative; min-height: 64px; border: 1px solid var(--line); border-radius: 10px;
+    background: transparent; color: var(--ink); text-align: left; padding: 6px 6px 6px 7px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .day.editable:hover { border-color: var(--pink-deep); }
+  .day:not(.editable) { cursor: default; }
+  .day:disabled { opacity: .35; }
+  .day.out { opacity: .5; }
+  .day .n { font-size: .8rem; color: var(--muted); }
+  .day.today { border-color: var(--today); box-shadow: 0 0 0 1px var(--today); }
+  .day.today .n { color: var(--today); font-weight: 700; }
+  .day .t {
+    font-family: var(--font-lcd); font-size: .78rem; background: var(--lcd); color: var(--lcd-ink);
+    border-radius: 5px; padding: 1px 4px; align-self: flex-start; white-space: nowrap;
+  }
+  .wk {
+    display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
+    border-radius: 10px; background: color-mix(in srgb, var(--pink) 22%, transparent); min-height: 64px; padding: 4px;
+  }
+  .wk .l { font-size: .7rem; color: var(--muted); }
+  .wk .v { font-family: var(--font-lcd); font-size: .82rem; font-weight: 500; }
+  @media (max-width: 560px) {
+    .day { min-height: 54px; padding: 4px; }
+    .day .t { font-size: .66rem; padding: 1px 3px; }
+    .wk .v { font-size: .72rem; }
+    .grid { gap: 3px; }
+  }
+
+  .tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; align-items: center; }
+  .tools small { color: var(--muted); }
+  .tools small.err { color: #c0392b; }
+
+  dialog {
+    border: 0; border-radius: 20px; padding: 22px; width: min(440px, calc(100vw - 32px));
+    background: var(--panel); color: var(--ink);
+  }
+  dialog::backdrop { background: rgba(20,20,30,.5); }
+  dialog h3 { margin: 0 0 4px; font-size: 1.2rem; }
+  dialog p { margin: 0 0 14px; color: var(--muted); font-size: .9rem; }
+  dialog a { color: var(--pink-deep); }
+  .status { min-height: 1.4em; font-size: .88rem; margin: 10px 0 0; color: var(--muted); }
+  .status.err { color: #c0392b; }
+  .time-row { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px 0 6px; }
+  .time-row label { display: flex; flex-direction: column; align-items: center; font-size: .75rem; color: var(--muted); gap: 4px; }
+  .time-row input {
+    width: 76px; font-family: var(--font-lcd); font-size: 1.7rem; text-align: center;
+    background: var(--lcd); color: var(--lcd-ink); border: 0; border-radius: 10px; padding: 8px 0;
+    box-shadow: inset 0 2px 6px rgba(0,0,0,.18);
+  }
+  .time-row .colon { font-family: var(--font-lcd); font-size: 1.7rem; padding-top: 18px; }
+  .actions { display: flex; gap: 8px; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; }
+  .actions .right { display: flex; gap: 8px; margin-left: auto; }
+  .link-danger { background: none; border: 0; color: #c0392b; padding: 8px 4px; font-size: .88rem; }
+  .pick { width: 100%; }
+  .bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 8px; display: none; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--pink-deep); transition: width .2s; }
+  .sr { position: absolute; left: -9999px; }
+  .tok {
+    width: 100%; font-family: var(--font-lcd); font-size: .9rem; padding: 10px 12px; margin-bottom: 10px;
+    border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--ink);
+  }
+  .field-label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+  ol.steps { margin: 0 0 14px; padding-left: 20px; color: var(--muted); font-size: .9rem; }
+  ol.steps li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GATE study log</h1>
+  <p class="sub">Daily study time, read from a photo of the timer.</p>
+
+  <section class="today-bar" id="todayBar" aria-live="polite"></section>
+
+  <section class="stats" aria-label="Study statistics">
+    <div class="stat" id="weekStat"></div>
+    <div class="stat" id="monthStat"></div>
+  </section>
+
+  <section class="cal">
+    <div class="cal-head">
+      <h2 id="monthTitle"></h2>
+      <div class="cal-nav">
+        <button class="btn ghost small" id="prev" aria-label="Previous month">‹</button>
+        <button class="btn ghost small" id="thisMonth">Today</button>
+        <button class="btn ghost small" id="next" aria-label="Next month">›</button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <div class="tools">
+    <button class="btn ghost small" id="exportBtn">Export backup</button>
+    <button class="btn ghost small" id="importBtn" style="display:none">Import backup</button>
+    <input type="file" id="importFile" accept="application/json" class="sr">
+    <button class="btn ghost small" id="ownerBtn">Owner login</button>
+    <small id="note"></small>
+  </div>
+</main>
+
+<dialog id="dlg">
+  <h3 id="dlgTitle">Log study time</h3>
+  <p id="dlgDate"></p>
+  <input type="file" id="photo" accept="image/*" class="sr">
+  <button class="btn pick" id="pickBtn">Choose timer photo</button>
+  <div class="bar" id="bar"><i></i></div>
+  <div class="status" id="status"></div>
+  <div class="time-row">
+    <label>hours<input id="hh" type="number" min="0" max="23" inputmode="numeric" value="0"></label>
+    <span class="colon">:</span>
+    <label>min<input id="mm" type="number" min="0" max="59" inputmode="numeric" value="0"></label>
+    <span class="colon">:</span>
+    <label>sec<input id="ss" type="number" min="0" max="59" inputmode="numeric" value="0"></label>
+  </div>
+  <div class="actions">
+    <button class="link-danger" id="delBtn" type="button">Remove entry</button>
+    <div class="right">
+      <button class="btn ghost" id="cancelBtn" type="button">Cancel</button>
+      <button class="btn" id="saveBtn" type="button">Save time</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="ownerDlg">
+  <h3>Owner login</h3>
+  <div id="loginForm">
+    <p>Anyone can view this log. Only you can change it, using a GitHub token that is saved in this browser only.</p>
+    <ol class="steps">
+      <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a fine-grained token</a>.</li>
+      <li>Under "Repository access", choose "Only select repositories" and pick this repo.</li>
+      <li>Under "Permissions", set Contents to "Read and write". Choose the longest expiry.</li>
+      <li>Generate it and paste it below.</li>
+    </ol>
+    <label class="field-label" for="repoIn">Repository (owner/name)</label>
+    <input class="tok" id="repoIn" type="text" placeholder="yourname/your-repo" autocomplete="off" spellcheck="false">
+    <label class="field-label" for="tokenIn">Token</label>
+    <input class="tok" id="tokenIn" type="password" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+  </div>
+  <div id="loggedIn" style="display:none">
+    <p>You're logged in as owner on this device. Changes are saved to <strong id="repoName"></strong> and shown to everyone within about a minute.</p>
+  </div>
+  <div class="status" id="ownerStatus"></div>
+  <div class="actions">
+    <button class="link-danger" id="logoutBtn" type="button" style="display:none">Log out on this device</button>
+    <div class="right">
+      <button class="btn ghost" id="ownerClose" type="button">Close</button>
+      <button class="btn" id="loginBtn" type="button">Log in</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const OWNER_KEY = "gate-owner-v1";
+  const LEGACY_KEY = "gate-study-log-v1"; // data from the earlier browser-only version
+  const FILE_PATH = "data.json";
+
+  /* ---------- state ---------- */
+  let data = {};            // { "YYYY-MM-DD": seconds }
+  let owner = { token: "", repo: "" };
+  try { owner = JSON.parse(localStorage.getItem(OWNER_KEY) || "null") || owner; } catch (e) {}
+  const isOwner = () => !!(owner.token && owner.repo);
+
+  const cleanData = obj => {
+    const out = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v > 0) out[k] = Math.round(v);
+    }
+    return out;
+  };
+
+  /* ---------- date helpers (local time, weeks start Monday) ---------- */
+  const pad = n => String(n).padStart(2, "0");
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const mondayIndex = d => (d.getDay() + 6) % 7;
+  const today = () => startOfDay(new Date());
+
+  const hm = s => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return `${h}h ${pad(m)}m`; };
+  const total = (from, to) => { let t = 0; for (let d = from; d <= to; d = addDays(d, 1)) t += data[keyOf(d)] || 0; return t; };
+  const countDays = (from, to) => { let c = 0; for (let d = from; d <= to; d = addDays(d, 1)) if (data[keyOf(d)]) c++; return c; };
+
+  let view = new Date(today().getFullYear(), today().getMonth(), 1);
+
+  const note = (msg, err) => { const n = $("note"); n.textContent = msg || ""; n.className = err ? "err" : ""; };
+
+  /* ---------- render ---------- */
+  function render() {
+    const t = today();
+    const tk = keyOf(t);
+    const editable = isOwner();
+
+    // today bar
+    const bar = $("todayBar");
+    if (editable) {
+      if (data[tk]) {
+        bar.innerHTML = `<div><strong>Today: ${hm(data[tk])}</strong><span>Logged. You can update it if you study more.</span></div>
+          <button class="btn ghost" data-open="${tk}">Update today</button>`;
+      } else {
+        bar.innerHTML = `<div><strong>No study time logged today</strong><span>Upload a photo of your timer to add it.</span></div>
+          <button class="btn" data-open="${tk}">Upload today's photo</button>`;
+      }
+    } else {
+      bar.innerHTML = data[tk]
+        ? `<div><strong>Today: ${hm(data[tk])}</strong><span>Studied so far today.</span></div>`
+        : `<div><strong>No study time logged today yet</strong><span>Check back later.</span></div>`;
+    }
+
+    // this week stats (Mon to today)
+    const wStart = addDays(t, -mondayIndex(t));
+    const wDays = mondayIndex(t) + 1;
+    const wTotal = total(wStart, t);
+    $("weekStat").innerHTML = `<h2>This week</h2>
+      <div class="lcd"><span class="k">Total</span><span class="v">${hm(wTotal)}</span></div>
+      <div class="lcd"><span class="k">Average / day</span><span class="v">${hm(wTotal / wDays)}</span></div>
+      <div class="foot">${countDays(wStart, t)} of ${wDays} days logged</div>`;
+
+    // viewed month stats
+    const first = new Date(view.getFullYear(), view.getMonth(), 1);
+    const last = new Date(view.getFullYear(), view.getMonth() + 1, 0);
+    const monthName = first.toLocaleString(undefined, { month: "long", year: "numeric" });
+    let elapsed;
+    if (first > t) elapsed = 0;
+    else if (last < t) elapsed = last.getDate();
+    else elapsed = t.getDate();
+    const mEnd = elapsed ? new Date(first.getFullYear(), first.getMonth(), elapsed) : first;
+    const mTotal = elapsed ? total(first, mEnd) : 0;
+    $("monthStat").innerHTML = `<h2>${monthName}</h2>
+      <div class="lcd"><span class="k">Total</span><span class="v">${hm(mTotal)}</span></div>
+      <div class="lcd"><span class="k">Average / day</span><span class="v">${elapsed ? hm(mTotal / elapsed) : "0h 00m"}</span></div>
+      <div class="foot">${elapsed ? countDays(first, mEnd) : 0} of ${elapsed} days logged</div>`;
+
+    // calendar
+    $("monthTitle").textContent = monthName;
+    let html = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(d => `<div class="dow">${d}</div>`).join("") + `<div class="dow">Week</div>`;
+    const gridStart = addDays(first, -mondayIndex(first));
+    const gridEnd = addDays(last, 6 - mondayIndex(last));
+    for (let ws = gridStart; ws <= gridEnd; ws = addDays(ws, 7)) {
+      for (let i = 0; i < 7; i++) {
+        const d = addDays(ws, i), k = keyOf(d);
+        const cls = ["day"];
+        if (d.getMonth() !== first.getMonth()) cls.push("out");
+        if (k === tk) cls.push("today");
+        const future = d > t;
+        if (editable && !future) cls.push("editable");
+        const label = d.toDateString() + (data[k] ? ", " + hm(data[k]) : "");
+        html += `<button class="${cls.join(" ")}" ${editable ? `data-open="${k}"` : 'tabindex="-1"'} ${future ? "disabled" : ""} aria-label="${label}">
+          <span class="n">${d.getDate()}</span>${data[k] ? `<span class="t">${hm(data[k])}</span>` : ""}</button>`;
+      }
+      const wt = total(ws, addDays(ws, 6));
+      html += `<div class="wk"><span class="l">total</span><span class="v">${wt ? hm(wt) : "–"}</span></div>`;
+    }
+    $("grid").innerHTML = html;
+
+    $("importBtn").style.display = editable ? "" : "none";
+    $("ownerBtn").textContent = editable ? "Owner settings" : "Owner login";
+  }
+
+  /* ---------- GitHub repo storage (data.json) ---------- */
+  async function gh(path, opts = {}) {
+    const r = await fetch("https://api.github.com" + path, {
+      ...opts,
+      cache: "no-store",
+      headers: {
+        Authorization: "Bearer " + owner.token,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json"
+      }
+    });
+    if (!r.ok) {
+      let msg = `GitHub error ${r.status}.`;
+      if (r.status === 401) msg = "GitHub rejected the token. Check it and try again.";
+      else if (r.status === 403 || r.status === 404) msg = "The token can't access this repo. Check the repo name and that Contents is set to Read and write.";
+      else if (r.status === 409 || r.status === 422) msg = "The file changed while saving. Try again.";
+      const e = new Error(msg); e.status = r.status; throw e;
+    }
+    return r.json();
+  }
+  const b64enc = s => btoa(unescape(encodeURIComponent(s)));
+  const b64dec = s => decodeURIComponent(escape(atob(s.replace(/\s/g, ""))));
+
+  async function readRepoFile() {
+    try {
+      const j = await fetch(`https://api.github.com/repos/${owner.repo}/contents/${FILE_PATH}`, {
+        cache: "no-store",
+        headers: { Authorization: "Bearer " + owner.token, Accept: "application/vnd.github+json" }
+      });
+      if (j.status === 404) return { data: {}, sha: null };
+      if (!j.ok) { const e = new Error(j.status === 401 ? "GitHub rejected the token. Check it and try again." : `GitHub error ${j.status}.`); e.status = j.status; throw e; }
+      const body = await j.json();
+      return { data: cleanData(JSON.parse(body.content ? b64dec(body.content) : "{}")), sha: body.sha };
+    } catch (e) {
+      if (e instanceof SyntaxError) return { data: {}, sha: null };
+      throw e;
+    }
+  }
+  async function writeRepoFile(obj, sha, message) {
+    const body = { message, content: b64enc(JSON.stringify(obj, null, 2) + "\n") };
+    if (sha) body.sha = sha;
+    await gh(`/repos/${owner.repo}/contents/${FILE_PATH}`, { method: "PUT", body: JSON.stringify(body) });
+  }
+
+  // fetch the latest file first so nothing saved from another device is overwritten
+  async function mutate(fn, message) {
+    if (!isOwner()) return;
+    note("Saving…");
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let cur = null;
+      try {
+        cur = await readRepoFile();
+        data = cur.data;
+        fn();
+        await writeRepoFile(data, cur.sha, message);
+        render();
+        note("Saved. Everyone sees it in about a minute.");
+        return true;
+      } catch (e) {
+        if ((e.status === 409 || e.status === 422) && attempt === 0) continue;
+        if (cur) data = cur.data;
+        render();
+        note(e.message || "Couldn't save.", true);
+        return false;
+      }
+    }
+  }
+
+  async function loadData() {
+    note("");
+    try {
+      if (isOwner()) {
+        data = (await readRepoFile()).data;
+      } else {
+        const r = await fetch(FILE_PATH + "?t=" + Date.now(), { cache: "no-store" });
+        data = r.ok ? cleanData(await r.json()) : {};
+      }
+    } catch (e) {
+      note(isOwner() ? (e.message || "Couldn't load your data.") : "Couldn't load the study data.", true);
+    }
+    render();
+  }
+
+  /* ---------- day dialog ---------- */
+  const dlg = $("dlg");
+  let editing = null;
+  const setStatus = (msg, err) => { const s = $("status"); s.textContent = msg || ""; s.className = "status" + (err ? " err" : ""); };
+  const setBar = p => { const b = $("bar"); b.style.display = p == null ? "none" : "block"; if (p != null) b.firstElementChild.style.width = Math.round(p * 100) + "%"; };
+  const clamp = (v, max) => Math.max(0, Math.min(max, parseInt(v, 10) || 0));
+
+  function openDay(key) {
+    editing = key;
+    const [y, m, d] = key.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    $("dlgDate").textContent = date.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    const secs = data[key] || 0;
+    $("hh").value = Math.floor(secs / 3600);
+    $("mm").value = Math.floor((secs % 3600) / 60);
+    $("ss").value = secs % 60;
+    $("delBtn").style.display = data[key] ? "" : "none";
+    $("photo").value = "";
+    setStatus(data[key] ? "Current entry shown. Upload a new photo to replace it." : "");
+    setBar(null);
+    dlg.showModal();
+  }
+
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-open]");
+    if (b && !b.disabled && isOwner()) openDay(b.dataset.open);
+  });
+  $("pickBtn").onclick = () => $("photo").click();
+  $("cancelBtn").onclick = () => dlg.close();
+  $("saveBtn").onclick = () => {
+    const h = clamp($("hh").value, 23), m = clamp($("mm").value, 59), s = clamp($("ss").value, 59);
+    const secs = h * 3600 + m * 60 + s, key = editing;
+    dlg.close();
+    mutate(() => { if (secs > 0) data[key] = secs; else delete data[key]; },
+      secs > 0 ? `Log ${key}: ${hm(secs)}` : `Remove ${key}`);
+  };
+  $("delBtn").onclick = () => {
+    const key = editing;
+    dlg.close();
+    mutate(() => { delete data[key]; }, `Remove ${key}`);
+  };
+
+  /* ---------- reading the timer photo ---------- */
+  async function loadBitmap(file) {
+    if (window.createImageBitmap) {
+      try { return await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) {}
+    }
+    return new Promise((res, rej) => {
+      const img = new Image();
+      img.onload = () => res(img);
+      img.onerror = rej;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  function toCanvas(bmp, maxW) {
+    const w = bmp.width, h = bmp.height, sc = Math.min(1, maxW / Math.max(w, h));
+    const c = document.createElement("canvas");
+    c.width = Math.round(w * sc); c.height = Math.round(h * sc);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return c;
+  }
+
+  // grayscale + Otsu threshold: dark LCD digits become black on white
+  function binarize(canvas) {
+    const ctx = canvas.getContext("2d");
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const px = img.data, n = px.length / 4, gray = new Uint8ClampedArray(n), hist = new Array(256).fill(0);
+    for (let i = 0; i < n; i++) {
+      const v = (px[i*4] * 0.299 + px[i*4+1] * 0.587 + px[i*4+2] * 0.114) | 0;
+      gray[i] = v; hist[v]++;
+    }
+    let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let wB = 0, sB = 0, best = 0, thr = 128;
+    for (let i = 0; i < 256; i++) {
+      wB += hist[i]; if (!wB) continue;
+      const wF = n - wB; if (!wF) break;
+      sB += i * hist[i];
+      const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) ** 2;
+      if (v > best) { best = v; thr = i; }
+    }
+    thr = Math.max(0, thr - 12);
+    for (let i = 0; i < n; i++) { const o = gray[i] > thr ? 255 : 0; px[i*4] = px[i*4+1] = px[i*4+2] = o; px[i*4+3] = 255; }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+  }
+
+  // digits like 5:00 + small 02  ->  h:mm:ss
+  function parseTime(text) {
+    const d = (text || "").replace(/\D/g, "");
+    if (d.length === 6) return { h: +d.slice(0,2), m: +d.slice(2,4), s: +d.slice(4,6) };
+    if (d.length === 5) return { h: +d[0], m: +d.slice(1,3), s: +d.slice(3,5) };
+    if (d.length === 4) return { h: +d[0], m: +d.slice(1,3), s: 0 };
+    if (d.length === 3) return { h: 0, m: +d.slice(0,1), s: +d.slice(1,3) };
+    return null;
+  }
+  const valid = t => t && t.h < 24 && t.m < 60 && t.s < 60;
+
+  let worker = null;
+  async function getWorker() {
+    if (worker) return worker;
+    worker = await Tesseract.createWorker("eng", 1, {
+      logger: m => { if (m.status === "recognizing text") setBar(0.4 + m.progress * 0.6); else setBar(0.15); }
+    });
+    await worker.setParameters({ tessedit_char_whitelist: "0123456789:", tessedit_pageseg_mode: "6" });
+    return worker;
+  }
+
+  $("photo").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    $("saveBtn").disabled = true; $("pickBtn").disabled = true;
+    setStatus("Reading the timer…"); setBar(0.05);
+    try {
+      if (!window.Tesseract) throw new Error("The reader could not load. Check your internet connection.");
+      const bmp = await loadBitmap(file);
+      const w = await getWorker();
+      let found = null;
+      for (const binary of [true, false]) {
+        const c = toCanvas(bmp, 1600);
+        if (binary) binarize(c);
+        const { data: r } = await w.recognize(c);
+        const t = parseTime(r.text);
+        if (valid(t)) { found = t; break; }
+      }
+      if (found) {
+        $("hh").value = found.h; $("mm").value = found.m; $("ss").value = found.s;
+        setStatus(`Read ${found.h}:${pad(found.m)}:${pad(found.s)}. Check it matches your timer, then save.`);
+      } else {
+        setStatus("Couldn't read the digits. Type the time from your timer below.", true);
+      }
+    } catch (err) {
+      setStatus(err.message || "Something went wrong. Type the time below.", true);
+    } finally {
+      setBar(null);
+      $("saveBtn").disabled = false; $("pickBtn").disabled = false;
+    }
+  });
+
+  /* ---------- calendar nav ---------- */
+  $("prev").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); render(); };
+  $("next").onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); render(); };
+  $("thisMonth").onclick = () => { view = new Date(today().getFullYear(), today().getMonth(), 1); render(); };
+
+  /* ---------- backup ---------- */
+  $("exportBtn").onclick = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `gate-study-log-${keyOf(today())}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $("importBtn").onclick = () => $("importFile").click();
+  $("importFile").addEventListener("change", async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const incoming = cleanData(JSON.parse(await f.text()));
+      const n = Object.keys(incoming).length;
+      const ok = await mutate(() => { Object.assign(data, incoming); }, `Import ${n} days`);
+      if (ok) alert(`Imported ${n} days.`);
+    } catch (err) { alert("That file isn't a valid backup."); }
+    e.target.value = "";
+  });
+
+  /* ---------- owner login ---------- */
+  const odlg = $("ownerDlg");
+  const setOwnerStatus = (m, err) => { const s = $("ownerStatus"); s.textContent = m || ""; s.className = "status" + (err ? " err" : ""); };
+
+  function guessRepo() {
+    const m = location.hostname.match(/^(.+)\.github\.io$/i);
+    if (!m) return "";
+    const seg = location.pathname.split("/").filter(Boolean)[0];
+    const repo = seg && !/\.html?$/i.test(seg) ? seg : `${m[1]}.github.io`;
+    return `${m[1]}/${repo}`;
+  }
+  function ownerDialogUI() {
+    const on = isOwner();
+    $("loginForm").style.display = on ? "none" : "";
+    $("loggedIn").style.display = on ? "" : "none";
+    $("loginBtn").style.display = on ? "none" : "";
+    $("logoutBtn").style.display = on ? "" : "none";
+    $("repoName").textContent = owner.repo;
+    if (!on) $("repoIn").value = $("repoIn").value || guessRepo();
+    setOwnerStatus("");
+  }
+  $("ownerBtn").onclick = () => { ownerDialogUI(); odlg.showModal(); };
+  $("ownerClose").onclick = () => odlg.close();
+
+  $("loginBtn").onclick = async () => {
+    const repo = $("repoIn").value.trim().replace(/^https?:\/\/github\.com\//i, "").replace(/\/+$/, "");
+    const token = $("tokenIn").value.trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { setOwnerStatus("Enter the repo as owner/name.", true); return; }
+    if (!token) { setOwnerStatus("Paste your token first.", true); return; }
+    $("loginBtn").disabled = true; setOwnerStatus("Checking…");
+    const prev = owner;
+    owner = { token, repo };
+    try {
+      const info = await gh(`/repos/${repo}`);
+      if (info.permissions && !info.permissions.push) throw new Error("This token can only read the repo. Set Contents to Read and write.");
+      const cur = await readRepoFile();
+      // bring in anything logged with the earlier browser-only version
+      let legacy = {};
+      try { legacy = cleanData(JSON.parse(localStorage.getItem(LEGACY_KEY) || "{}")); } catch (e) {}
+      const merged = { ...legacy, ...cur.data };
+      const needsWrite = !cur.sha || Object.keys(merged).length !== Object.keys(cur.data).length;
+      if (needsWrite) await writeRepoFile(merged, cur.sha, cur.sha ? "Import earlier local entries" : "Create study log");
+      data = merged;
+      try { localStorage.setItem(OWNER_KEY, JSON.stringify(owner)); } catch (e) {}
+      $("tokenIn").value = "";
+      render(); ownerDialogUI(); setOwnerStatus("Logged in. You can now upload timer photos.");
+    } catch (e) {
+      owner = prev;
+      setOwnerStatus(e.message || "Couldn't log in.", true);
+    } finally { $("loginBtn").disabled = false; }
+  };
+  $("logoutBtn").onclick = () => {
+    owner = { token: "", repo: "" };
+    try { localStorage.removeItem(OWNER_KEY); } catch (e) {}
+    ownerDialogUI(); setOwnerStatus("Logged out on this device.");
+    loadData();
+  };
+
+  render();
+  loadData();
+})();
+</script>
+</body>
+</html>
