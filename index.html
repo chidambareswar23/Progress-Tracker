@@ -65,8 +65,14 @@
     background: var(--panel); border-radius: 18px; padding: 16px 18px; margin-bottom: 16px;
     border-left: 6px solid var(--pink);
   }
+  .today-bar .info { flex: 1 1 220px; min-width: 0; }
   .today-bar strong { display: block; font-size: 1.05rem; }
-  .today-bar span { color: var(--muted); font-size: .9rem; }
+  .today-bar .info > span { color: var(--muted); font-size: .9rem; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .prog-wrap { margin-top: 10px; }
+  .prog { height: 8px; border-radius: 8px; background: var(--line); overflow: hidden; }
+  .prog i { display: block; height: 100%; background: var(--pink-deep); border-radius: 8px; }
+  .prog-wrap small { display: block; margin-top: 4px; color: var(--muted); font-size: .82rem; }
 
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   @media (max-width: 560px) { .stats { grid-template-columns: 1fr; } }
@@ -104,12 +110,20 @@
     font-family: var(--font-lcd); font-size: .78rem; background: var(--lcd); color: var(--lcd-ink);
     border-radius: 5px; padding: 1px 4px; align-self: flex-start; white-space: nowrap;
   }
+  .day .t.met { background: var(--pink); color: #3a1522; font-weight: 500; }
+  .day .t.zero { background: transparent; color: var(--muted); border: 1px dashed var(--muted); }
   .wk {
     display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px;
     border-radius: 10px; background: color-mix(in srgb, var(--pink) 22%, transparent); min-height: 64px; padding: 4px;
   }
   .wk .l { font-size: .7rem; color: var(--muted); }
   .wk .v { font-family: var(--font-lcd); font-size: .82rem; font-weight: 500; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 12px 6px 2px; font-size: .78rem; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 18px; height: 10px; border-radius: 3px; }
+  .legend .lg-met { background: var(--pink); }
+  .legend .lg-low { background: var(--lcd); }
+  .legend .lg-zero { border: 1px dashed var(--muted); }
   @media (max-width: 560px) {
     .day { min-height: 54px; padding: 4px; }
     .day .t { font-size: .66rem; padding: 1px 3px; }
@@ -142,7 +156,8 @@
   .actions { display: flex; gap: 8px; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; }
   .actions .right { display: flex; gap: 8px; margin-left: auto; }
   .link-danger { background: none; border: 0; color: #c0392b; padding: 8px 4px; font-size: .88rem; }
-  .pick { width: 100%; }
+  .pick-row { display: flex; gap: 8px; }
+  .pick-row .btn { flex: 1; padding-left: 10px; padding-right: 10px; }
   .bar { height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; margin-top: 8px; display: none; }
   .bar i { display: block; height: 100%; width: 0; background: var(--pink-deep); transition: width .2s; }
   .sr { position: absolute; left: -9999px; }
@@ -158,7 +173,7 @@
 <body>
 <main>
   <h1>GATE study log</h1>
-  <p class="sub">Daily study time, read from a photo of the timer.</p>
+  <p class="sub">Daily study time, read from a photo of the timer. Honest numbers only.</p>
 
   <section class="today-bar" id="todayBar" aria-live="polite"></section>
 
@@ -177,9 +192,11 @@
       </div>
     </div>
     <div class="grid" id="grid"></div>
+    <div class="legend" id="legend"></div>
   </section>
 
   <div class="tools">
+    <button class="btn ghost small" id="targetBtn" style="display:none">Daily target</button>
     <button class="btn ghost small" id="exportBtn">Export backup</button>
     <button class="btn ghost small" id="importBtn" style="display:none">Import backup</button>
     <input type="file" id="importFile" accept="application/json" class="sr">
@@ -192,7 +209,10 @@
   <h3 id="dlgTitle">Log study time</h3>
   <p id="dlgDate"></p>
   <input type="file" id="photo" accept="image/*" class="sr">
-  <button class="btn pick" id="pickBtn">Choose timer photo</button>
+  <div class="pick-row">
+    <button class="btn" id="pickBtn">Choose timer photo</button>
+    <button class="btn ghost" id="zeroBtn" type="button">I didn't study</button>
+  </div>
   <div class="bar" id="bar"><i></i></div>
   <div class="status" id="status"></div>
   <div class="time-row">
@@ -207,6 +227,22 @@
     <div class="right">
       <button class="btn ghost" id="cancelBtn" type="button">Cancel</button>
       <button class="btn" id="saveBtn" type="button">Save time</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="targetDlg">
+  <h3>Daily target</h3>
+  <p>How long do you want to study each day? Days that reach the target are highlighted in pink. Set 0 to remove the target.</p>
+  <div class="time-row">
+    <label>hours<input id="tH" type="number" min="0" max="23" inputmode="numeric" value="0"></label>
+    <span class="colon">:</span>
+    <label>min<input id="tM" type="number" min="0" max="59" inputmode="numeric" value="0"></label>
+  </div>
+  <div class="actions">
+    <div class="right">
+      <button class="btn ghost" id="tCancel" type="button">Cancel</button>
+      <button class="btn" id="tSave" type="button">Save target</button>
     </div>
   </div>
 </dialog>
@@ -244,22 +280,31 @@
 (() => {
   const $ = id => document.getElementById(id);
   const OWNER_KEY = "gate-owner-v1";
-  const LEGACY_KEY = "gate-study-log-v1"; // data from the earlier browser-only version
+  const LEGACY_KEY = "gate-study-log-v1"; // data from the earliest browser-only version
   const FILE_PATH = "data.json";
 
   /* ---------- state ---------- */
-  let data = {};            // { "YYYY-MM-DD": seconds }
+  let data = {};     // { "YYYY-MM-DD": seconds }  (0 means "logged: did not study")
+  let target = 0;    // daily target in seconds, 0 = none
   let owner = { token: "", repo: "" };
   try { owner = JSON.parse(localStorage.getItem(OWNER_KEY) || "null") || owner; } catch (e) {}
   const isOwner = () => !!(owner.token && owner.repo);
+  const has = k => Object.prototype.hasOwnProperty.call(data, k);
 
   const cleanData = obj => {
     const out = {};
     for (const [k, v] of Object.entries(obj || {})) {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v > 0) out[k] = Math.round(v);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v >= 0) out[k] = Math.round(v);
     }
     return out;
   };
+  const cleanTarget = v => (Number.isFinite(v) && v > 0 ? Math.min(Math.round(v), 86399) : 0);
+  // new format: { target, days: {...} }. Older format: the days map on its own.
+  function parseFile(obj) {
+    obj = obj && typeof obj === "object" ? obj : {};
+    if (obj.days && typeof obj.days === "object") return { data: cleanData(obj.days), target: cleanTarget(obj.target) };
+    return { data: cleanData(obj), target: 0 };
+  }
 
   /* ---------- date helpers (local time, weeks start Monday) ---------- */
   const pad = n => String(n).padStart(2, "0");
@@ -271,7 +316,8 @@
 
   const hm = s => { s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60); return `${h}h ${pad(m)}m`; };
   const total = (from, to) => { let t = 0; for (let d = from; d <= to; d = addDays(d, 1)) t += data[keyOf(d)] || 0; return t; };
-  const countDays = (from, to) => { let c = 0; for (let d = from; d <= to; d = addDays(d, 1)) if (data[keyOf(d)]) c++; return c; };
+  const countDays = (from, to) => { let c = 0; for (let d = from; d <= to; d = addDays(d, 1)) if (has(keyOf(d))) c++; return c; };
+  const metDays = (from, to) => { let c = 0; if (!target) return 0; for (let d = from; d <= to; d = addDays(d, 1)) if ((data[keyOf(d)] || 0) >= target) c++; return c; };
 
   let view = new Date(today().getFullYear(), today().getMonth(), 1);
 
@@ -284,19 +330,31 @@
     const editable = isOwner();
 
     // today bar
+    const done = data[tk] || 0;
+    let prog = "";
+    if (target) {
+      const pct = Math.min(100, Math.round(done / target * 100));
+      prog = `<div class="prog-wrap"><div class="prog"><i style="width:${pct}%"></i></div>
+        <small>${hm(done)} of ${hm(target)} target${done >= target ? " ✓" : ""}</small></div>`;
+    }
     const bar = $("todayBar");
     if (editable) {
-      if (data[tk]) {
-        bar.innerHTML = `<div><strong>Today: ${hm(data[tk])}</strong><span>Logged. You can update it if you study more.</span></div>
-          <button class="btn ghost" data-open="${tk}">Update today</button>`;
+      if (has(tk)) {
+        bar.innerHTML = `<div class="info"><strong>Today: ${hm(done)}</strong>
+          <span>${done === 0 ? "Logged as a day without study." : "Logged. You can update it if you study more."}</span>${prog}</div>
+          <div class="btn-row"><button class="btn ghost" data-open="${tk}">Update today</button></div>`;
       } else {
-        bar.innerHTML = `<div><strong>No study time logged today</strong><span>Upload a photo of your timer to add it.</span></div>
-          <button class="btn" data-open="${tk}">Upload today's photo</button>`;
+        bar.innerHTML = `<div class="info"><strong>Nothing logged today</strong>
+          <span>Upload your timer photo, or record a zero if you didn't study.</span>${prog}</div>
+          <div class="btn-row">
+            <button class="btn" data-open="${tk}">Upload today's photo</button>
+            <button class="btn ghost" data-zero="${tk}">I didn't study today</button>
+          </div>`;
       }
     } else {
-      bar.innerHTML = data[tk]
-        ? `<div><strong>Today: ${hm(data[tk])}</strong><span>Studied so far today.</span></div>`
-        : `<div><strong>No study time logged today yet</strong><span>Check back later.</span></div>`;
+      bar.innerHTML = has(tk)
+        ? `<div class="info"><strong>Today: ${hm(done)}</strong><span>${done === 0 ? "No study today." : "Studied so far today."}</span>${prog}</div>`
+        : `<div class="info"><strong>Nothing logged today yet</strong><span>Check back later.</span>${prog}</div>`;
     }
 
     // this week stats (Mon to today)
@@ -306,7 +364,7 @@
     $("weekStat").innerHTML = `<h2>This week</h2>
       <div class="lcd"><span class="k">Total</span><span class="v">${hm(wTotal)}</span></div>
       <div class="lcd"><span class="k">Average / day</span><span class="v">${hm(wTotal / wDays)}</span></div>
-      <div class="foot">${countDays(wStart, t)} of ${wDays} days logged</div>`;
+      <div class="foot">${countDays(wStart, t)} of ${wDays} days logged${target ? ` · target met on ${metDays(wStart, t)}` : ""}</div>`;
 
     // viewed month stats
     const first = new Date(view.getFullYear(), view.getMonth(), 1);
@@ -321,7 +379,7 @@
     $("monthStat").innerHTML = `<h2>${monthName}</h2>
       <div class="lcd"><span class="k">Total</span><span class="v">${hm(mTotal)}</span></div>
       <div class="lcd"><span class="k">Average / day</span><span class="v">${elapsed ? hm(mTotal / elapsed) : "0h 00m"}</span></div>
-      <div class="foot">${elapsed ? countDays(first, mEnd) : 0} of ${elapsed} days logged</div>`;
+      <div class="foot">${elapsed ? countDays(first, mEnd) : 0} of ${elapsed} days logged${target && elapsed ? ` · target met on ${metDays(first, mEnd)}` : ""}</div>`;
 
     // calendar
     $("monthTitle").textContent = monthName;
@@ -336,16 +394,28 @@
         if (k === tk) cls.push("today");
         const future = d > t;
         if (editable && !future) cls.push("editable");
-        const label = d.toDateString() + (data[k] ? ", " + hm(data[k]) : "");
+        const secs = data[k];
+        let chip = "";
+        if (has(k)) {
+          const c = secs === 0 ? "zero" : (target && secs >= target ? "met" : "");
+          chip = `<span class="t ${c}">${hm(secs)}</span>`;
+        }
+        const label = d.toDateString() + (has(k) ? ", " + hm(secs) : "");
         html += `<button class="${cls.join(" ")}" ${editable ? `data-open="${k}"` : 'tabindex="-1"'} ${future ? "disabled" : ""} aria-label="${label}">
-          <span class="n">${d.getDate()}</span>${data[k] ? `<span class="t">${hm(data[k])}</span>` : ""}</button>`;
+          <span class="n">${d.getDate()}</span>${chip}</button>`;
       }
       const wt = total(ws, addDays(ws, 6));
       html += `<div class="wk"><span class="l">total</span><span class="v">${wt ? hm(wt) : "–"}</span></div>`;
     }
     $("grid").innerHTML = html;
 
+    $("legend").innerHTML =
+      (target ? `<span><i class="lg-met"></i>Target met (${hm(target)})</span><span><i class="lg-low"></i>Below target</span>` : "") +
+      `<span><i class="lg-zero"></i>Logged 0h (no study)</span>`;
+
     $("importBtn").style.display = editable ? "" : "none";
+    $("targetBtn").style.display = editable ? "" : "none";
+    $("targetBtn").textContent = target ? `Daily target: ${hm(target)}` : "Set daily target";
     $("ownerBtn").textContent = editable ? "Owner settings" : "Owner login";
   }
 
@@ -373,58 +443,61 @@
   const b64dec = s => decodeURIComponent(escape(atob(s.replace(/\s/g, ""))));
 
   async function readRepoFile() {
-    try {
-      const j = await fetch(`https://api.github.com/repos/${owner.repo}/contents/${FILE_PATH}`, {
-        cache: "no-store",
-        headers: { Authorization: "Bearer " + owner.token, Accept: "application/vnd.github+json" }
-      });
-      if (j.status === 404) return { data: {}, sha: null };
-      if (!j.ok) { const e = new Error(j.status === 401 ? "GitHub rejected the token. Check it and try again." : `GitHub error ${j.status}.`); e.status = j.status; throw e; }
-      const body = await j.json();
-      return { data: cleanData(JSON.parse(body.content ? b64dec(body.content) : "{}")), sha: body.sha };
-    } catch (e) {
-      if (e instanceof SyntaxError) return { data: {}, sha: null };
-      throw e;
+    const r = await fetch(`https://api.github.com/repos/${owner.repo}/contents/${FILE_PATH}`, {
+      cache: "no-store",
+      headers: { Authorization: "Bearer " + owner.token, Accept: "application/vnd.github+json" }
+    });
+    if (r.status === 404) return { data: {}, target: 0, sha: null };
+    if (!r.ok) {
+      const e = new Error(r.status === 401 ? "GitHub rejected the token. Check it and try again." : `GitHub error ${r.status}.`);
+      e.status = r.status; throw e;
     }
+    const body = await r.json();
+    let parsed = { data: {}, target: 0 };
+    try { parsed = parseFile(JSON.parse(body.content ? b64dec(body.content) : "{}")); } catch (e) {}
+    return { ...parsed, sha: body.sha };
   }
-  async function writeRepoFile(obj, sha, message) {
-    const body = { message, content: b64enc(JSON.stringify(obj, null, 2) + "\n") };
+  async function writeRepoFile(days, tgt, sha, message) {
+    const body = { message, content: b64enc(JSON.stringify({ target: tgt, days }, null, 2) + "\n") };
     if (sha) body.sha = sha;
     await gh(`/repos/${owner.repo}/contents/${FILE_PATH}`, { method: "PUT", body: JSON.stringify(body) });
   }
 
   // fetch the latest file first so nothing saved from another device is overwritten
   async function mutate(fn, message) {
-    if (!isOwner()) return;
+    if (!isOwner()) return false;
     note("Saving…");
     for (let attempt = 0; attempt < 2; attempt++) {
       let cur = null;
       try {
         cur = await readRepoFile();
-        data = cur.data;
+        data = cur.data; target = cur.target;
         fn();
-        await writeRepoFile(data, cur.sha, message);
+        await writeRepoFile(data, target, cur.sha, message);
         render();
         note("Saved. Everyone sees it in about a minute.");
         return true;
       } catch (e) {
         if ((e.status === 409 || e.status === 422) && attempt === 0) continue;
-        if (cur) data = cur.data;
+        if (cur) { data = cur.data; target = cur.target; }
         render();
         note(e.message || "Couldn't save.", true);
         return false;
       }
     }
+    return false;
   }
 
   async function loadData() {
     note("");
     try {
       if (isOwner()) {
-        data = (await readRepoFile()).data;
+        const cur = await readRepoFile();
+        data = cur.data; target = cur.target;
       } else {
         const r = await fetch(FILE_PATH + "?t=" + Date.now(), { cache: "no-store" });
-        data = r.ok ? cleanData(await r.json()) : {};
+        const parsed = r.ok ? parseFile(await r.json()) : { data: {}, target: 0 };
+        data = parsed.data; target = parsed.target;
       }
     } catch (e) {
       note(isOwner() ? (e.message || "Couldn't load your data.") : "Couldn't load the study data.", true);
@@ -448,30 +521,51 @@
     $("hh").value = Math.floor(secs / 3600);
     $("mm").value = Math.floor((secs % 3600) / 60);
     $("ss").value = secs % 60;
-    $("delBtn").style.display = data[key] ? "" : "none";
+    $("delBtn").style.display = has(key) ? "" : "none";
     $("photo").value = "";
-    setStatus(data[key] ? "Current entry shown. Upload a new photo to replace it." : "");
+    setStatus(has(key) ? "Current entry shown. Upload a new photo or edit the time." : "");
     setBar(null);
     dlg.showModal();
   }
 
   document.addEventListener("click", e => {
+    if (!isOwner()) return;
+    const z = e.target.closest("[data-zero]");
+    if (z) { const key = z.dataset.zero; mutate(() => { data[key] = 0; }, `Log ${key}: 0h (no study)`); return; }
     const b = e.target.closest("[data-open]");
-    if (b && !b.disabled && isOwner()) openDay(b.dataset.open);
+    if (b && !b.disabled) openDay(b.dataset.open);
   });
   $("pickBtn").onclick = () => $("photo").click();
   $("cancelBtn").onclick = () => dlg.close();
+  $("zeroBtn").onclick = () => {
+    const key = editing;
+    dlg.close();
+    mutate(() => { data[key] = 0; }, `Log ${key}: 0h (no study)`);
+  };
   $("saveBtn").onclick = () => {
     const h = clamp($("hh").value, 23), m = clamp($("mm").value, 59), s = clamp($("ss").value, 59);
     const secs = h * 3600 + m * 60 + s, key = editing;
     dlg.close();
-    mutate(() => { if (secs > 0) data[key] = secs; else delete data[key]; },
-      secs > 0 ? `Log ${key}: ${hm(secs)}` : `Remove ${key}`);
+    mutate(() => { data[key] = secs; }, secs > 0 ? `Log ${key}: ${hm(secs)}` : `Log ${key}: 0h (no study)`);
   };
   $("delBtn").onclick = () => {
     const key = editing;
     dlg.close();
     mutate(() => { delete data[key]; }, `Remove ${key}`);
+  };
+
+  /* ---------- daily target ---------- */
+  const tdlg = $("targetDlg");
+  $("targetBtn").onclick = () => {
+    $("tH").value = Math.floor(target / 3600);
+    $("tM").value = Math.floor((target % 3600) / 60);
+    tdlg.showModal();
+  };
+  $("tCancel").onclick = () => tdlg.close();
+  $("tSave").onclick = () => {
+    const s = clamp($("tH").value, 23) * 3600 + clamp($("tM").value, 59) * 60;
+    tdlg.close();
+    mutate(() => { target = s; }, s ? `Set daily target: ${hm(s)}` : "Remove daily target");
   };
 
   /* ---------- reading the timer photo ---------- */
@@ -543,7 +637,7 @@
   $("photo").addEventListener("change", async e => {
     const file = e.target.files[0];
     if (!file) return;
-    $("saveBtn").disabled = true; $("pickBtn").disabled = true;
+    $("saveBtn").disabled = true; $("pickBtn").disabled = true; $("zeroBtn").disabled = true;
     setStatus("Reading the timer…"); setBar(0.05);
     try {
       if (!window.Tesseract) throw new Error("The reader could not load. Check your internet connection.");
@@ -567,7 +661,7 @@
       setStatus(err.message || "Something went wrong. Type the time below.", true);
     } finally {
       setBar(null);
-      $("saveBtn").disabled = false; $("pickBtn").disabled = false;
+      $("saveBtn").disabled = false; $("pickBtn").disabled = false; $("zeroBtn").disabled = false;
     }
   });
 
@@ -578,7 +672,7 @@
 
   /* ---------- backup ---------- */
   $("exportBtn").onclick = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ target, days: data }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `gate-study-log-${keyOf(today())}.json`;
@@ -589,9 +683,12 @@
   $("importFile").addEventListener("change", async e => {
     const f = e.target.files[0]; if (!f) return;
     try {
-      const incoming = cleanData(JSON.parse(await f.text()));
-      const n = Object.keys(incoming).length;
-      const ok = await mutate(() => { Object.assign(data, incoming); }, `Import ${n} days`);
+      const inc = parseFile(JSON.parse(await f.text()));
+      const n = Object.keys(inc.data).length;
+      const ok = await mutate(() => {
+        Object.assign(data, inc.data);
+        if (!target && inc.target) target = inc.target;
+      }, `Import ${n} days`);
       if (ok) alert(`Imported ${n} days.`);
     } catch (err) { alert("That file isn't a valid backup."); }
     e.target.value = "";
@@ -633,13 +730,13 @@
       const info = await gh(`/repos/${repo}`);
       if (info.permissions && !info.permissions.push) throw new Error("This token can only read the repo. Set Contents to Read and write.");
       const cur = await readRepoFile();
-      // bring in anything logged with the earlier browser-only version
+      // bring in anything logged with the earliest browser-only version
       let legacy = {};
       try { legacy = cleanData(JSON.parse(localStorage.getItem(LEGACY_KEY) || "{}")); } catch (e) {}
       const merged = { ...legacy, ...cur.data };
       const needsWrite = !cur.sha || Object.keys(merged).length !== Object.keys(cur.data).length;
-      if (needsWrite) await writeRepoFile(merged, cur.sha, cur.sha ? "Import earlier local entries" : "Create study log");
-      data = merged;
+      if (needsWrite) await writeRepoFile(merged, cur.target, cur.sha, cur.sha ? "Import earlier local entries" : "Create study log");
+      data = merged; target = cur.target;
       try { localStorage.setItem(OWNER_KEY, JSON.stringify(owner)); } catch (e) {}
       $("tokenIn").value = "";
       render(); ownerDialogUI(); setOwnerStatus("Logged in. You can now upload timer photos.");
